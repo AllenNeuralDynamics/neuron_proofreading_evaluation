@@ -1,8 +1,0 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-authors:
-- given-names: "Allen Institute for Neural Dynamics"
-title: "neuron_proofreading_evaluation"
-version: "v0.0.0"
-date-release: 2026-04-08
-url: "https://github.com/AllenNeuralDynamics/neuron_proofreading_evaluation"
