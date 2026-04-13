@@ -10,6 +10,7 @@ Code for loading data to evaluate split correction pipeline.
 
 from segmentation_skeleton_metrics.data_handling.graph_loading import (
     GraphLoader,
+    LabelHandler,
 )
 from segmentation_skeleton_metrics.utils import util
 from segmentation_skeleton_metrics.utils.img_util import TensorStoreImage
@@ -41,7 +42,7 @@ def load_fragments(
     label_handler,
     anisotropy=(0.748, 0.748, 1.0),
     swc_names=set(),
-    use_anisotropy=False
+    use_anisotropy=False,
 ):
     graph_loader = GraphLoader(
         anisotropy=anisotropy,
@@ -77,6 +78,35 @@ def load_proposals_df(path, proposal_type=None, threshold=0):
 
 
 # --- Graph Operations ---
+def apply_segment_labeling(graphs, labels):
+    segment_ids = [util.get_segment_id(lbl) for lbl in labels]
+    label_handler = LabelHandler(labels=segment_ids)
+    for key, graph in graphs.items():
+        graph.relabel_nodes(label_handler)
+
+
+def build_graphs_at_threshold(
+    t, gt_graphs, fragment_graphs, labels, proposals_df
+):
+    # Label handler
+    proposals_df_t = proposals_df[proposals_df["Prediction"] > t]
+    label_pairs = list(proposals_df_t.index)
+    label_handler = LabelHandler(labels=labels, label_pairs=label_pairs)
+
+    # Build fragment graphs
+    fragment_graphs = (
+        update_and_merge_graphs(fragment_graphs, label_handler, proposals_df_t)
+        if t > 0.2
+        else None
+    )
+
+    # Build ground truth graphs
+    for graph in gt_graphs.values():
+        graph.relabel_nodes(label_handler)
+
+    return gt_graphs, fragment_graphs
+
+
 def combine_graphs(graphs, label_handler):
     """
     Combines graphs with the same label.
@@ -122,6 +152,29 @@ def merge_proposals(graphs, label_handler, proposals_df):
                 graphs[class_id1].add_edge(node1, node2)
 
 
+def relabel_nodes_wrt_graph(gt_graphs, fragment_graphs):
+    # Create segment graphs
+    labels = list(fragment_graphs.keys())
+    label_handler = LabelHandler(labels=labels, use_segment_mapping=True)
+    segment_graphs, node2label = combine_graphs(fragment_graphs, label_handler)
+
+    # Relabel ground truth graphs
+    for gt_graph in gt_graphs.values():
+        node_label = ["0"] * gt_graph.number_of_nodes()
+        for i in [i for i in gt_graph.nodes if gt_graph.node_label[i] != "0"]:
+            # Node info
+            segment_id = gt_graph.node_label[i]
+            xyz = gt_graph.node_xyz(i)
+
+            # Find closest fragment node
+            dist, node = segment_graphs[segment_id].kdtree.query(xyz)
+            if dist < 20:
+                node_label[i] = node2label[segment_id][node]
+
+        gt_graph.node_label = np.array(node_label)
+        gt_graph.fix_label_misalignments()
+
+
 def update_and_merge_graphs(graphs, label_handler, proposals_df):
     """
     Apply label updates and merge proposals into the graph collection.
@@ -151,18 +204,9 @@ def clean_tuple(t):
     Tuple[str]
         A tuple containing two cleaned identifiers, sorted lexicographically.
     """
-    proposal = str(t).translate(str.maketrans('', '', "()'"))
+    proposal = str(t).translate(str.maketrans("", "", "()'"))
     id1, id2 = sorted(proposal.replace(" ", "").split(","))
     return (id1, id2)
-
-
-def create_results_df(dt=0.05):
-    columns = [
-        "Threshold", "# Merges", "# Splits", "Precision", "Recall", "F1"
-    ]
-    results_df = pd.DataFrame(columns=columns)
-    results_df["Threshold"] = np.round(np.arange(0, 1 + dt, dt), decimals=2)
-    return results_df.set_index("Threshold")
 
 
 def flip_coordinates(graphs):
