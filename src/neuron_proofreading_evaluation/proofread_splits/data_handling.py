@@ -159,7 +159,7 @@ def relabel_nodes_wrt_graph(gt_graphs, fragment_graphs):
     segment_graphs, node2label = combine_graphs(fragment_graphs, label_handler)
 
     # Relabel ground truth graphs
-    missing_segment_ids = {}
+    missing_segment_ids = set()
     for gt_graph in gt_graphs.values():
         node_label = ["0"] * gt_graph.number_of_nodes()
         for i in [i for i in gt_graph.nodes if gt_graph.node_label[i] != "0"]:
