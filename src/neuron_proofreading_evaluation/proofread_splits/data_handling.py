@@ -149,7 +149,7 @@ def merge_proposals(graphs, label_handler, proposals_df):
             d1, node1 = graphs[class_id1].kdtree.query(xyz1)
             d2, node2 = graphs[class_id1].kdtree.query(xyz2)
             if d1 < 10 and d2 < 10:
-                graphs[class_id1].add_edge(node1, node2)
+                graphs[class_id1].add_highlighted_edge(node1, node2)
 
 
 def relabel_nodes_wrt_graph(gt_graphs, fragment_graphs):
@@ -159,7 +159,6 @@ def relabel_nodes_wrt_graph(gt_graphs, fragment_graphs):
     segment_graphs, node2label = combine_graphs(fragment_graphs, label_handler)
 
     # Relabel ground truth graphs
-    missing_segment_ids = set()
     for gt_graph in gt_graphs.values():
         node_label = ["0"] * gt_graph.number_of_nodes()
         for i in [i for i in gt_graph.nodes if gt_graph.node_label[i] != "0"]:
@@ -172,13 +171,9 @@ def relabel_nodes_wrt_graph(gt_graphs, fragment_graphs):
                 dist, node = segment_graphs[segment_id].kdtree.query(xyz)
                 if dist < 20:
                     node_label[i] = node2label[segment_id][node]
-            else:
-                missing_segment_ids.add(segment_id)
 
         gt_graph.node_label = np.array(node_label)
         gt_graph.fix_label_misalignments()
-
-    print("Missing Segment Graph:", missing_segment_ids)
 
 
 def update_and_merge_graphs(graphs, label_handler, proposals_df):
