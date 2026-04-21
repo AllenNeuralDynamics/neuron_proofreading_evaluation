@@ -56,7 +56,7 @@ def compute_splits_and_merges(
         )
 
         # Count merges (if applicable)
-        if t > 0.19:
+        if t >= 0.3:
             merge_cnts = merge_count_metric(gt_graphs_t, fragment_graphs_t)
             results_df.loc[t, "# Merges"] = merge_cnts["# Merges"].sum()
 
@@ -66,7 +66,7 @@ def compute_splits_and_merges(
 
 
 # --- Helpers ---
-def create_results_df(dt=0.05):
+def create_results_df(dt=0.02):
     columns = [
         "Threshold",
         "# Merges",
